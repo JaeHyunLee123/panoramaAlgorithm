@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <vector>
+#include <iomanip>
 #include "blend.h"
 
 using namespace std;
@@ -10,13 +11,80 @@ using namespace cv;
 
 //akaze 탐지를 위한 상수
 const float inlier_threshold = 2.5f; // Distance threshold to identify inliers with homography check
-const float nn_match_ratio = 0.8f;   // Nearest neighbor matching rati
+
+
+const double akaze_thresh = 3e-4; // AKAZE detection threshold set to locate about 1000 keypoints
+const double ransac_thresh = 2.5f; // RANSAC inlier threshold
+const double nn_match_ratio = 0.8f; // Nearest-neighbour matching ratio
+const int bb_min_inliers = 100; // Minimal number of inliers to draw bounding box
+const int stats_update_period = 10; // On-screen statistics are updated every 10 frames
 
 void akazeBF();
 
 int main()
 {
-    akazeBF();
+    VideoCapture video("panorama_video_sampe2.mp4");
+
+    Mat frame1, frame2;
+
+    int totalFrames = video.get(CAP_PROP_FRAME_COUNT);
+    float skippingFrames = totalFrames / 20.0;
+
+    
+
+
+    //-- Step 1: Detect the keypoints using SURF Detector
+    int minHessian = 400;
+    Ptr<AKAZE> akaze = AKAZE::create();
+    Ptr<ORB> orb = ORB::create(minHessian);
+    Ptr<SIFT> sift = SIFT::create(minHessian);
+    std::vector<KeyPoint> keypoints1;
+    std::vector<KeyPoint> keypoints2;
+    Mat descriptors1, descriptors2;
+
+    for (int i = 0; i < totalFrames; i += skippingFrames) {
+        cout << "Loading..." << endl;
+        video.set(CAP_PROP_POS_FRAMES, i);
+        video >> frame1;
+
+        video.set(CAP_PROP_POS_FRAMES,  i);
+        video >> frame2;
+
+        orb->detectAndCompute(frame1, noArray(), keypoints1, descriptors1);
+        orb->detectAndCompute(frame2, noArray(), keypoints2, descriptors2);
+
+        //-- Step 2: Matching descriptor vectors with a brute force matcher
+        Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create(DescriptorMatcher::BRUTEFORCE);
+        std::vector< std::vector<DMatch> > knn_matches;
+        matcher->knnMatch(descriptors1, descriptors2, knn_matches, 2);
+        //-- Filter matches using the Lowe's ratio test
+        const float ratio_thresh = 0.75f;
+        std::vector<DMatch> good_matches;
+        for (size_t i = 0; i < knn_matches.size(); i++)
+        {
+            if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
+            {
+                good_matches.push_back(knn_matches[i][0]);
+            }
+        }
+
+        //-- Draw keypoints
+        Mat img_keypoints1;
+        drawKeypoints(frame1, keypoints1, img_keypoints1);
+        Mat img_keypoints2;
+        drawKeypoints(frame2, keypoints2, img_keypoints2);
+        Mat img_matches;
+        drawMatches(frame1, keypoints1, frame2, keypoints2, good_matches, img_matches);
+
+
+        cout << "Frame: " << i << "/" << totalFrames << endl;
+    
+        //-- Show detected matches
+        imshow("Matches", img_matches);
+        cv::waitKey(0);
+    
+    }
+
 
     return 0;
 }
