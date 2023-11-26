@@ -40,13 +40,13 @@ int main()
 	float fixedRow = frames[0].rows;
 	int newCol;
 
-	Mat result = stitch_two_image(frames[10], frames[11]);
+	Mat result = stitch_two_image(frames[5], frames[6]);
 	newCol = (float)result.cols / (float)result.rows * fixedRow;
 	resize(result, result, Size(newCol, fixedRow));
 
 	flip(result, result, 1);
-	flip(frames[9], frames[9], 1);
-	result = stitch_two_image(result, frames[9]);
+	flip(frames[4], frames[4], 1);
+	result = stitch_two_image(result, frames[4]);
 	flip(result, result, 1);
 	newCol = (float)result.cols / (float)result.rows * fixedRow;
 	resize(result, result, Size(newCol, fixedRow));
@@ -265,7 +265,8 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 				preCombineImg.at<cv::Vec3b>(i, j) = object_on_original.at<cv::Vec3b>(i, j);
 		}
 	}
-	//imshow("preCombineImg", preCombineImg);
+	imshow("preCombineImg", preCombineImg);
+
 
 	//이미지를 자르기
 	//작은 범위로 자르기
@@ -286,7 +287,10 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 			if (pointPolygonTest(contours[contoursIndex], Point(j, i), false) == 0)
 			{
 				//결과 영상에 대해 수행할 예정이기에 original_image를 붙인만큼의 길이를 계산해줘야 한다.
-				center.push_back(j + original_image.cols - originalCutImage.cols);
+				if (j >= right)
+					center.push_back(original_image.cols - originalCutImage.cols + right - 1);
+				else
+					center.push_back(j + original_image.cols - originalCutImage.cols);
 				break;
 			}
 		}
@@ -308,7 +312,8 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 		preCombineImg(Rect(0, top, right, result.rows)).
 			copyTo(result(Rect(original_image.cols - originalCutImage.cols, 0, right, result.rows)));
 	}
-
+	imshow("result", result);
+	//waitKey(0);
 	//blending 수행
 	result = ljh::blendImage(result, center, 20, 2);
 	return result;
