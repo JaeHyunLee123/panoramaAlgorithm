@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include "blend.h"
+#include <string>
 
 using namespace std;
 using namespace cv;
@@ -37,6 +38,7 @@ int main()
 		resize(frames[i], frames[i], Size(0, 0), 0.5, 0.5, INTER_LINEAR);
 	}
 
+
 	float fixedRow = frames[0].rows;
 	int newCol;
 
@@ -54,7 +56,9 @@ int main()
 	/*flip(frames[9], frames[9], 1);
 	imshow("1", frames[9]);
 	imshow("2", frames[10]);
-	imshow("3", frames[11]);*/
+	imshow("3", frames[11]);
+		
+	*/
 
 	imshow("result", result);
 	waitKey(0);
@@ -265,23 +269,27 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 				preCombineImg.at<cv::Vec3b>(i, j) = object_on_original.at<cv::Vec3b>(i, j);
 		}
 	}
-	imshow("preCombineImg", preCombineImg);
+	//imshow("preCombineImg", preCombineImg);
 
 
 	//이미지를 자르기
 	//작은 범위로 자르기
-	int top, right;
+	int top, bottom, right;
 	if (isRightYMax) {
 		top = max(SHIFT, rightMinPoint.y);
+		bottom = min(SHIFT + originalCutImage.rows, rightMaxPoint.y);
 	}
 	else {
 		top = max(SHIFT, rightMaxPoint.y);
+		bottom = min(SHIFT + originalCutImage.rows, rightMinPoint.y);
 	}
 	right = min(rightMaxPoint.x, rightMinPoint.x);
 
+	int height = bottom - top;
+
 	//blending을 위한 경계선 벡터 생성
 	vector<int> center;
-	for (int i = top; i < top + original_image.rows; i++) {
+	for (int i = top; i < bottom; i++) {
 		for (int j = 0; j < object_on_original.cols; j++) {
 			//해당 점이 경계선 위에 있는 경우 값 넣기
 			if (pointPolygonTest(contours[contoursIndex], Point(j, i), false) == 0)
@@ -300,7 +308,7 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 	// 결과를 저장할 mat 생성 후 데이터 옮기기
 	//잘린 original과 object_on_original를 합쳐야 한다.
 	//분기문을 넣은 이유는 original_image.cols - originalCutImage.cols가 0이면 오류가 발생하기 때문이다.
-	Mat result = Mat::zeros(original_image.rows, original_image.cols - originalCutImage.cols + right, CV_8UC3);
+	Mat result = Mat::zeros(height, original_image.cols - originalCutImage.cols + right, CV_8UC3);
 
 	if (original_image.cols - originalCutImage.cols == 0) {
 		preCombineImg(Rect(0, top, right, result.rows)).
@@ -312,7 +320,7 @@ Mat stitch_two_image(Mat original_image, Mat object_image) {
 		preCombineImg(Rect(0, top, right, result.rows)).
 			copyTo(result(Rect(original_image.cols - originalCutImage.cols, 0, right, result.rows)));
 	}
-	imshow("result", result);
+	//imshow("result", result);
 	//waitKey(0);
 	//blending 수행
 	result = ljh::blendImage(result, center, 20, 2);
